@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "incyght_harness": {
+      "type": "stdio",
+      "command": "${CURSOR_PLUGIN_ROOT}/bin/incyght-harness-launch"
+    }
+  }
+}

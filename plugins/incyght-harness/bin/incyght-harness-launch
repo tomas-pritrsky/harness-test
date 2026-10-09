@@ -1,0 +1,173 @@
+#!/bin/sh
+# incyght-harness-launch (POSIX: linux + macos)
+#
+# This IS the stdio MCP command. Claude Code spawns it at session start; its
+# stdin/stdout must carry the MCP protocol untouched. Therefore:
+#   - every diagnostic goes to stderr or $INCYGHT_LOG, NEVER stdout
+#   - the last thing we do is `exec java -jar` so it inherits our stdio
+#
+# The distribution is TWO artifacts:
+#   - a trimmed JRE built by jlink (harness-runtime-<platform>) -> bin/java
+#   - the harness fat JAR (harness-<platform>-<version>.jar), one per platform
+#     (each embeds only its own Playwright driver)
+# Combined at launch as:  <runtime>/bin/java -jar <jar>
+#
+# Responsibilities:
+#   1. resolve the pinned version + this machine's platform (platform detection
+#      gates everything — there is no universal fallback jar)
+#   2. provision-on-first-run: download + verify (sha256 pinned in the git-delivered
+#      manifest) the platform jar and the runtime, into the versioned cache
+#   3. exec  <runtime>/bin/java -jar <jar>   (falls back to system java if no
+#      bundled runtime exists for this platform)
+#
+# Invoked with `--prefetch` it does 1-2 then exits 0 without exec'ing — a manual/CI
+# cache-warm entry point (no hook uses it; hook-vs-MCP start order is undocumented).
+set -eu
+
+# capture the mode up front — the download helper reuses $@ for curl args
+PREFETCH=0; [ "${1:-}" = "--prefetch" ] && PREFETCH=1
+
+# Resolve paths from THIS script's location, not from injected env: the plugin's
+# manifest.json sits at the plugin root (next to bin/), so $0 always finds it even
+# if the .mcp.json `env` block was not applied to this process (hook/MCP load order
+# is not guaranteed). Env vars still win when set (used for local testing).
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PLUGIN_ROOT=$(CDPATH= cd -- "$SELF_DIR/.." && pwd)
+MANIFEST="${INCYGHT_MANIFEST:-$PLUGIN_ROOT/manifest.json}"
+# cache dir: the client's per-plugin data dir when provided (Claude Code sets
+# CLAUDE_PLUGIN_DATA, Agent Plugins clients set PLUGIN_DATA), else a stable HOME path
+DATA="${INCYGHT_DATA:-${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/incyght-harness}}}"
+LOG="${INCYGHT_LOG:-$DATA/harness.log}"
+mkdir -p "$DATA"
+
+log() { printf '[incyght-launch] %s\n' "$*" >>"$LOG" 2>/dev/null; printf '[incyght-launch] %s\n' "$*" >&2; }
+die() { log "FATAL: $*"; exit 1; }
+
+[ -f "$MANIFEST" ] || die "manifest not found at $MANIFEST"
+
+# ---- manifest reader --------------------------------------------------------
+# Reads the flat manifest with grep/sed — each auth/<platform> object is one line —
+# so no jq dependency is required.
+line_for()  { grep "\"$1\"[[:space:]]*:" "$MANIFEST" | head -1; }
+field_of()  { printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"; }
+scalar()    { sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$MANIFEST" | head -1; }
+
+# block_line <block> <key> — the single-line entry for <key> inside "block": { ... }.
+# The "jars" and "runtimes" maps share the same platform keys, so a flat line_for
+# would collide; this bounds the search to one block. Each map entry is one line;
+# the block's own closing brace starts a line ("^ }"), while entry lines start with
+# "key": — so we can bound the block without jq.
+block_line() {
+  awk -v blk="$1" -v key="$2" '
+    $0 ~ "\"" blk "\"[[:space:]]*:" { inblk=1; next }
+    inblk && /^[[:space:]]*}/       { inblk=0 }
+    inblk && $0 ~ "\"" key "\"[[:space:]]*:" { print; exit }
+  ' "$MANIFEST"
+}
+
+SCHEMA=$(sed -n 's/.*"manifestSchema"[^0-9]*\([0-9]*\).*/\1/p' "$MANIFEST" | head -1)
+[ "${SCHEMA:-2}" = "2" ] || die "manifest schema $SCHEMA newer than this launcher understands — update the plugin"
+
+VERSION=$(scalar harnessVersion); [ -n "$VERSION" ] || die "no harnessVersion in manifest"
+BASE=$(scalar baseUrl);           [ -n "$BASE" ]    || die "no baseUrl in manifest"
+
+AUTHLINE=$(line_for auth || true)
+HDR=$(field_of "$AUTHLINE" header)      # e.g. X-Incyght-Token  (empty = no gating)
+ENVVAR=$(field_of "$AUTHLINE" envVar)   # e.g. INCYGHT_TOKEN
+
+# ---- platform ----------------------------------------------------------------
+# Detected first: it gates jar AND runtime resolution. There is no universal jar.
+case "$(uname -s)/$(uname -m)" in
+  Linux/x86_64)                PLATFORM=linux-x64 ;;
+  Darwin/arm64|Darwin/aarch64) PLATFORM=macos-arm64 ;;
+  *) PLATFORM="" ;;
+esac
+[ -n "$PLATFORM" ] || die "unsupported platform $(uname -s)/$(uname -m) — supported: linux-x64, macos-arm64, windows-x64"
+
+# ---- resolve the platform jar (hard-fail when this release has none) ----------
+JARLINE=$(block_line jars "$PLATFORM")
+[ -n "$JARLINE" ] || die "no harness jar for platform '$PLATFORM' in this release — supported: linux-x64, macos-arm64, windows-x64"
+JARFILE=$(field_of "$JARLINE" file)
+JARSHA=$(field_of "$JARLINE" sha256)
+[ -n "$JARFILE" ] && [ -n "$JARSHA" ] || die "malformed jar entry for '$PLATFORM'"
+
+# ---- download + verify helpers ----------------------------------------------
+sha_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum   >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+  else die "no sha256 tool (sha256sum/shasum) available"; fi
+}
+
+# fetch <remote-file> <dest-path> <want-sha256>
+fetch_verify() {
+  _file=$1; _dest=$2; _want=$3
+  command -v curl >/dev/null 2>&1 || die "curl not available to fetch $_file"
+  mkdir -p "$(dirname "$_dest")"
+  _tmp="$_dest.part.$$"
+  TOKEN=""; [ -n "$ENVVAR" ] && eval "TOKEN=\${$ENVVAR:-}"
+  # a gated network host needs the token; a local file:// host (dev/demo) does not
+  case "$BASE" in http://*|https://*)
+    if [ -n "$HDR" ] && [ -z "$TOKEN" ]; then
+      # prefetch is best-effort cache warming — skip quietly; the MCP server run
+      # provisions on demand with its own token. Only the real run hard-fails.
+      [ "$PREFETCH" = 1 ] && { log "prefetch: no access token yet — skipping warm-up"; exit 0; }
+      die "access token not set — set incyght_token in the plugin config (env $ENVVAR)"
+    fi ;;
+  esac
+  set -- -fsSL "$BASE/$_file" -o "$_tmp"
+  [ -n "$HDR" ] && [ -n "$TOKEN" ] && set -- -H "$HDR: $TOKEN" "$@"
+  log "fetching $_file"
+  curl "$@" >>"$LOG" 2>&1 || { rm -f "$_tmp"; die "download failed: $BASE/$_file"; }
+  _got=$(sha_of "$_tmp")
+  [ "$_got" = "$_want" ] || { rm -f "$_tmp"; die "checksum mismatch for $_file (host tampering?) want=$_want got=$_got"; }
+  mv "$_tmp" "$_dest"
+  log "verified $_file"
+}
+
+BASE_CACHE="$DATA/harness/$VERSION"
+JAR_PATH="$BASE_CACHE/$JARFILE"
+
+# ---- provision the platform jar ----------------------------------------------
+[ -f "$JAR_PATH" ] || fetch_verify "$JARFILE" "$JAR_PATH" "$JARSHA"
+
+# ---- provision the runtime, or fall back to system java ----------------------
+JAVA=""
+RTLINE=$(block_line runtimes "$PLATFORM" || true)
+RTFILE=$(field_of "$RTLINE" file)
+RTSHA=$(field_of "$RTLINE" sha256)
+
+if [ -n "${RTFILE:-}" ] && [ -n "${RTSHA:-}" ]; then
+  PLAT_DIR="$BASE_CACHE/$PLATFORM"
+  RUNTIME_DIR="$PLAT_DIR/harness-runtime"      # archive's top-level dir
+  JAVA="$RUNTIME_DIR/bin/java"
+  if [ ! -x "$JAVA" ]; then
+    ARCHIVE="$DATA/.dl.$$.$RTFILE"
+    fetch_verify "$RTFILE" "$ARCHIVE" "$RTSHA"
+    STAGE="$PLAT_DIR.stage.$$"; mkdir -p "$STAGE"
+    case "$RTFILE" in
+      *.tar.gz|*.tgz) tar -xzf "$ARCHIVE" -C "$STAGE" ;;
+      *) rm -f "$ARCHIVE"; die "unexpected archive type for POSIX: $RTFILE" ;;
+    esac
+    rm -f "$ARCHIVE"
+    rm -rf "$PLAT_DIR"; mkdir -p "$(dirname "$PLAT_DIR")"; mv "$STAGE" "$PLAT_DIR"
+    [ -x "$JAVA" ] || die "runtime extracted but $JAVA missing"
+    log "runtime installed to $RUNTIME_DIR"
+  fi
+else
+  command -v java >/dev/null 2>&1 || die "no bundled runtime for '${PLATFORM:-$(uname -s)/$(uname -m)}' and no system java"
+  log "no bundled runtime for this platform — using system java"
+  JAVA=java
+fi
+
+# GC: keep this version + one previous, drop the rest
+ls -1dt "$DATA/harness"/*/ 2>/dev/null | tail -n +3 | while read -r old; do
+  log "gc removing $old"; rm -rf "$old"
+done
+
+# ---- prefetch mode: cache warmed, do not speak MCP ---------------------------
+if [ "$PREFETCH" = "1" ]; then
+  log "prefetch complete for $VERSION ($PLATFORM)"; exit 0
+fi
+
+log "exec $JAVA -jar $JAR_PATH"
+exec "$JAVA" -jar "$JAR_PATH"

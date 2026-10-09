@@ -1,0 +1,7 @@
+{
+  "name": "incyght-harness",
+  "version": "0.0.0-dev",
+  "description": "Maps an application into its pages, APIs, architecture and domain rules, then uses that map to threat model every change and keep security a required acceptance criterion during agentic development.",
+  "author": { "name": "Incyght" },
+  "mcpServers": "./.cursor-plugin/mcp.json"
+}

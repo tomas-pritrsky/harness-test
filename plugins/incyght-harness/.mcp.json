@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "incyght_harness": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/incyght-harness-launch",
+      "env": {
+        "INCYGHT_MANIFEST": "${CLAUDE_PLUGIN_ROOT}/manifest.json",
+        "INCYGHT_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "INCYGHT_LOG": "${CLAUDE_PLUGIN_DATA}/harness.log",
+        "INCYGHT_TOKEN": "${user_config.incyght_token}"
+      }
+    }
+  }
+}

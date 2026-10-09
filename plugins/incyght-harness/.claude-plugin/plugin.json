@@ -1,0 +1,15 @@
+{
+  "name": "incyght-harness",
+  "version": "0.0.0-dev",
+  "description": "Maps an application into its pages, APIs, architecture and domain rules, then uses that map to threat model every change and keep security a required acceptance criterion during agentic development.",
+  "author": { "name": "Incyght" },
+  "userConfig": {
+    "incyght_token": {
+      "type": "string",
+      "title": "Incyght access token",
+      "description": "Access token for downloading the harness runtime from the Incyght distribution host. Ask your Incyght contact for one.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

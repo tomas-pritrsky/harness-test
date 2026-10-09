@@ -1,0 +1,16 @@
+{
+  "manifestSchema": 2,
+  "harnessVersion": "@HARNESS_VERSION@",
+  "baseUrl": "@BASE_URL@",
+  "auth": { "header": "@AUTH_HEADER@", "envVar": "@AUTH_ENVVAR@" },
+  "jars": {
+    "linux-x64":   { "file": "harness-linux-x64-@HARNESS_VERSION@.jar",   "sha256": "@SHA_JAR_LINUX_X64@" },
+    "macos-arm64": { "file": "harness-macos-arm64-@HARNESS_VERSION@.jar", "sha256": "@SHA_JAR_MACOS_ARM64@" },
+    "windows-x64": { "file": "harness-windows-x64-@HARNESS_VERSION@.jar", "sha256": "@SHA_JAR_WINDOWS_X64@" }
+  },
+  "runtimes": {
+    "linux-x64":   { "file": "harness-runtime-linux-x64-@HARNESS_VERSION@.tar.gz",   "sha256": "@SHA_RT_LINUX_X64@" },
+    "macos-arm64": { "file": "harness-runtime-macos-arm64-@HARNESS_VERSION@.tar.gz", "sha256": "@SHA_RT_MACOS_ARM64@" },
+    "windows-x64": { "file": "harness-runtime-windows-x64-@HARNESS_VERSION@.zip",     "sha256": "@SHA_RT_WINDOWS_X64@" }
+  }
+}
