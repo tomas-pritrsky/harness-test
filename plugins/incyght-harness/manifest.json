@@ -1,7 +1,7 @@
 {
   "manifestSchema": 2,
   "harnessVersion": "0.0.1-SNAPSHOT",
-  "baseUrl": "file:///C:/git/incyght-harness/harness/target",
+  "baseUrl": "https://incyght-harness-dist.incyght.workers.dev/",
   "auth": { "header": "X-Incyght-Token", "envVar": "INCYGHT_TOKEN" },
   "jars": {
     "windows-x64": { "file": "harness-0.0.1-SNAPSHOT.jar", "sha256": "45c5d71def94ce0c02f472a0d9381d1ac3dcd8f72e904ac486b9564d40cf62f4" }
