@@ -1,5 +1,5 @@
 {
-  "name": "incyght",
+  "name": "incyght-test",
   "owner": { "name": "Incyght" },
   "metadata": { "description": "Incyght security harness distribution for Claude Code." },
   "plugins": [
