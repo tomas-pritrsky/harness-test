@@ -57,12 +57,46 @@ scalar()    { sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" 
 # would collide; this bounds the search to one block. Each map entry is one line;
 # the block's own closing brace starts a line ("^ }"), while entry lines start with
 # "key": — so we can bound the block without jq.
+# awk patterns use [ \t], not [[:space:]]: mawk 1.3.3 (older Debian/Ubuntu) has no
+# POSIX classes and silently never matches. CRs are stripped for CRLF checkouts, and
+# the block's header line is kept (minus the header) in case an entry shares it.
 block_line() {
   awk -v blk="$1" -v key="$2" '
-    $0 ~ "\"" blk "\"[[:space:]]*:" { inblk=1; next }
-    inblk && /^[[:space:]]*}/       { inblk=0 }
-    inblk && $0 ~ "\"" key "\"[[:space:]]*:" { print; exit }
+    { sub(/\r$/, "") }
+    !inblk && $0 ~ "\"" blk "\"[ \t]*:" { inblk=1; sub("^.*\"" blk "\"[ \t]*:[ \t]*[{]?", "") }
+    inblk && $0 ~ "\"" key "\"[ \t]*:" { if (gsub(/"file"/, "&") == 1) print; exit }
+    inblk && /^[ \t]*}/                { inblk=0 }
   ' "$MANIFEST"
+}
+
+# block_keys <block> — comma-separated keys of "block": { ... } (for diagnostics)
+block_keys() {
+  awk -v blk="$1" '
+    { sub(/\r$/, "") }
+    !inblk && $0 ~ "\"" blk "\"[ \t]*:" { inblk=1; sub("^.*\"" blk "\"[ \t]*:[ \t]*[{]?", "") }
+    inblk && /^[ \t]*}/ { exit }
+    inblk && match($0, /"[^"]+"[ \t]*:/) {
+      k = substr($0, RSTART + 1); sub(/".*/, "", k); printf "%s%s", sep, k; sep = ", "
+    }
+  ' "$MANIFEST"
+}
+
+# missing_entry <block> <what> — die with the specific reason the lookup came up empty
+missing_entry() {
+  _ctx="manifest $MANIFEST (harnessVersion $VERSION)"
+  grep -q "\"$1\"[[:space:]]*:" "$MANIFEST" \
+    || die "$_ctx has no \"$1\" map — manifest format not understood by this launcher; update the plugin"
+  grep "\"$1\"[[:space:]]*:" "$MANIFEST" | grep -q '"file".*"file"' \
+    && die "$_ctx is minified/collapsed — this launcher needs one '\"<platform>\": { ... }' entry per line"
+  _keys=$(block_keys "$1")
+  if [ -z "$_keys" ]; then
+    die "$_ctx: could not read any entries in \"$1\" — expected one '\"<platform>\": { ... }' entry per line (manifest reformatted/minified?)"
+  fi
+  case ", $_keys, " in
+    *", $PLATFORM, "*)
+      die "$_ctx lists '$PLATFORM' under \"$1\" but the entry could not be parsed — it must be a single line '\"$PLATFORM\": { \"file\": ..., \"sha256\": ... }'" ;;
+  esac
+  die "this release ($VERSION) ships no $2 for platform '$PLATFORM' — it provides: $_keys"
 }
 
 SCHEMA=$(sed -n 's/.*"manifestSchema"[^0-9]*\([0-9]*\).*/\1/p' "$MANIFEST" | head -1)
@@ -80,13 +114,15 @@ ENVVAR=$(field_of "$AUTHLINE" envVar)   # e.g. INCYGHT_TOKEN
 case "$(uname -s)/$(uname -m)" in
   Linux/x86_64)                PLATFORM=linux-x64 ;;
   Darwin/arm64|Darwin/aarch64) PLATFORM=macos-arm64 ;;
+  MINGW*/*|MSYS*/*|CYGWIN*/*)
+    die "this is the POSIX launcher running under $(uname -s) — on Windows use bin/incyght-harness-launch.cmd" ;;
   *) PLATFORM="" ;;
 esac
-[ -n "$PLATFORM" ] || die "unsupported platform $(uname -s)/$(uname -m) — supported: linux-x64, macos-arm64, windows-x64"
+[ -n "$PLATFORM" ] || die "unsupported platform $(uname -s)/$(uname -m) — release $VERSION provides: $(block_keys jars || true)"
 
 # ---- resolve the platform jar (hard-fail when this release has none) ----------
 JARLINE=$(block_line jars "$PLATFORM")
-[ -n "$JARLINE" ] || die "no harness jar for platform '$PLATFORM' in this release — supported: linux-x64, macos-arm64, windows-x64"
+[ -n "$JARLINE" ] || missing_entry jars "harness jar"
 JARFILE=$(field_of "$JARLINE" file)
 JARSHA=$(field_of "$JARLINE" sha256)
 [ -n "$JARFILE" ] && [ -n "$JARSHA" ] || die "malformed jar entry for '$PLATFORM'"
