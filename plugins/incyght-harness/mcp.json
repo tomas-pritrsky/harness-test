@@ -3,7 +3,7 @@
   "mcpServers": {
     "incyght_harness": {
       "type": "stdio",
-      "command": "./bin/incyght-harness-launch"
+      "command": "bash ./bin/incyght-harness-launch"
     }
   }
 }
