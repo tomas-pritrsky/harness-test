@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "${CURSOR_PLUGIN_ROOT}/bin/incyght-harness-launch",
       "env": {
-        "INCYGHT_TOKEN": "${env:INCYGHT_TOKEN}"
+        "INCYGHT_TOKEN": "${INCYGHT_TOKEN}"
       }
     }
   }
