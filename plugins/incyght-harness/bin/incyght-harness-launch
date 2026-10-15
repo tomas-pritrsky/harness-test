@@ -153,7 +153,17 @@ fetch_verify() {
   set -- -fsSL "$BASE/$_file" -o "$_tmp"
   [ -n "$HDR" ] && [ -n "$TOKEN" ] && set -- -H "$HDR: $TOKEN" "$@"
   log "fetching $_file"
-  curl "$@" >>"$LOG" 2>&1 || { rm -f "$_tmp"; die "download failed: $BASE/$_file"; }
+  # surface curl's own error and the HTTP status — the log is not visible to the MCP client
+  if ! _out=$(curl -w ' [HTTP %{http_code}]' "$@" 2>&1); then
+    rm -f "$_tmp"
+    case "$_out" in
+      *"HTTP 401"*) _why="no access token sent" ;;
+      *"HTTP 403"*) _why="access token rejected (env $ENVVAR, token starts '$(printf %.4s "$TOKEN")')" ;;
+      *"HTTP 404"*) _why="file not on host" ;;
+      *)            _why="network or host error" ;;
+    esac
+    die "download failed: $BASE/$_file — $_why: $(printf '%s' "$_out" | tr '\n' ' ')"
+  fi
   _got=$(sha_of "$_tmp")
   [ "$_got" = "$_want" ] || { rm -f "$_tmp"; die "checksum mismatch for $_file (host tampering?) want=$_want got=$_got"; }
   mv "$_tmp" "$_dest"
