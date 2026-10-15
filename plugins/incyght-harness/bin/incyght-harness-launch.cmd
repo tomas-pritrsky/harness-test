@@ -55,6 +55,12 @@ set "JAR_PATH=%BASE_CACHE%\%JARFILE%"
 set "RUNTIME_DIR=%BASE_CACHE%\%PLATFORM%\harness-runtime"
 set "JAVA=%RUNTIME_DIR%\bin\java.exe"
 call set "TOKEN=%%%ENVVAR%%%"
+rem Claude Code fills %ENVVAR% from ${user_config.*}, Cursor fills %ENVVAR%_ENV from ${env:*};
+rem the other one arrives as literal ${...} text. Use whichever was actually substituted.
+if not defined TOKEN set "TOKEN=${"
+if "%TOKEN:~0,2%"=="${" call set "TOKEN=%%%ENVVAR%_ENV%%"
+if not defined TOKEN set "TOKEN=${"
+if "%TOKEN:~0,2%"=="${" set "TOKEN="
 
 rem ---- provision the JAR ------------------------------------------------------
 if not exist "%JAR_PATH%" (
@@ -89,7 +95,7 @@ rem ---- :fetch_verify <remote-file> <dest-path> <want-sha256> -----------------
 setlocal
 set "F=%~1" & set "DEST=%~2" & set "WANT=%~3"
 rem a gated network host needs the token; a local file:// host (dev/demo) does not
-if /I "%BASE:~0,4%"=="http" if not "%HDR%"=="" if "%TOKEN%"=="" ( echo [incyght-launch] FATAL access token not set - configure incyght_token 1>&2 & endlocal & exit /b 1 )
+if /I "%BASE:~0,4%"=="http" if not "%HDR%"=="" if "%TOKEN%"=="" ( echo [incyght-launch] FATAL access token not set - Claude Code: configure incyght_token, Cursor: set %ENVVAR% 1>&2 & endlocal & exit /b 1 )
 set "TMP=%DATA%\dl-%RANDOM%.tmp"
 echo [incyght-launch] fetching %F% 1>&2
 rem curl.exe (bundled since Win10 1803) streams straight to disk; Invoke-WebRequest

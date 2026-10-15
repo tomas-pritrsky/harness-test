@@ -16,7 +16,8 @@
     "incyght_harness": {
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/incyght-harness-launch",
       "env": {
-        "INCYGHT_TOKEN": "${user_config.incyght_token}"
+        "INCYGHT_TOKEN": "${user_config.incyght_token}",
+        "INCYGHT_TOKEN_ENV": "${env:INCYGHT_TOKEN}"
       }
     }
   }

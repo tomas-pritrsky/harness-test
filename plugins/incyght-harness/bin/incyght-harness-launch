@@ -141,13 +141,19 @@ fetch_verify() {
   mkdir -p "$(dirname "$_dest")"
   _tmp="$_dest.part.$$"
   TOKEN=""; [ -n "$ENVVAR" ] && eval "TOKEN=\${$ENVVAR:-}"
+  # Claude Code and Cursor both start the server from .claude-plugin/plugin.json, and
+  # each fills in only its own placeholder, passing the other through literally:
+  # Claude Code sets $ENVVAR from ${user_config.*}, Cursor sets ${ENVVAR}_ENV from
+  # ${env:*}. Use whichever was actually substituted.
+  case "$TOKEN" in ''|'${'*) [ -n "$ENVVAR" ] && eval "TOKEN=\${${ENVVAR}_ENV:-}" ;; esac
+  case "$TOKEN" in '${'*) TOKEN="" ;; esac
   # a gated network host needs the token; a local file:// host (dev/demo) does not
   case "$BASE" in http://*|https://*)
     if [ -n "$HDR" ] && [ -z "$TOKEN" ]; then
       # prefetch is best-effort cache warming — skip quietly; the MCP server run
       # provisions on demand with its own token. Only the real run hard-fails.
       [ "$PREFETCH" = 1 ] && { log "prefetch: no access token yet — skipping warm-up"; exit 0; }
-      die "access token not set — set incyght_token in the plugin config (env $ENVVAR)"
+      die "access token not set — Claude Code: set incyght_token in the plugin config; Cursor: export $ENVVAR"
     fi ;;
   esac
   set -- -fsSL "$BASE/$_file" -o "$_tmp"
