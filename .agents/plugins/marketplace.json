@@ -1,0 +1,12 @@
+{
+  "name": "incyght-test",
+  "interface": { "displayName": "Incyght" },
+  "plugins": [
+    {
+      "name": "incyght-harness",
+      "source": { "source": "local", "path": "./plugins/incyght-harness" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Security"
+    }
+  ]
+}
