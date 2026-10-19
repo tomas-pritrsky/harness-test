@@ -1,10 +1,10 @@
 {
-  "name": "incyght-test",
+  "name": "incyght",
   "owner": { "name": "Incyght" },
   "metadata": { "description": "Incyght security harness distribution for Claude Code." },
   "plugins": [
     {
-      "name": "incyght-test",
+      "name": "incyght",
       "source": "./plugins/incyght-harness",
       "description": "Maps an application into its pages, APIs, architecture and domain rules, then uses that map to threat model every change and keep security a required acceptance criterion during agentic development."
     }

@@ -1,5 +1,5 @@
 {
-  "name": "incyght-test",
+  "name": "incyght",
   "interface": { "displayName": "Incyght" },
   "plugins": [
     {
