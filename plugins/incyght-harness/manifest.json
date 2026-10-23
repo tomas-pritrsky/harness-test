@@ -1,16 +1,16 @@
 {
   "manifestSchema": 2,
-  "harnessVersion": "0.2.0",
-  "baseUrl": "https://incyght-harness-dist.incyght.workers.dev/0.2.0",
+  "harnessVersion": "0.3.0",
+  "baseUrl": "https://incyght-harness-dist.incyght.workers.dev/0.3.0",
   "auth": { "header": "X-Incyght-Token", "envVar": "INCYGHT_TOKEN" },
   "jars": {
-    "linux-x64":   { "file": "harness-linux-x64-0.2.0.jar",   "sha256": "624d9c486b4d13c9317292a8d6cfb3fb05bd42ff0a49bb5fd8fd812c0e578c66" },
-    "macos-arm64": { "file": "harness-macos-arm64-0.2.0.jar", "sha256": "3816f5f8dff44ebd4039570dfdb3dd3018c1bb014b8783befea82ba120c7bdba" },
-    "windows-x64": { "file": "harness-windows-x64-0.2.0.jar", "sha256": "dba3d3b9c51aec5ef13a70933e917103a331aea001c59c5f2189bb986be230c8" }
+    "linux-x64":   { "file": "harness-linux-x64-0.3.0.jar",   "sha256": "ce4dde9ea97065939a7fadbf8e216b60ee169cec92c789a972bd960a6b134302" },
+    "macos-arm64": { "file": "harness-macos-arm64-0.3.0.jar", "sha256": "2f4dadd2dbf493c0ad8e3fbba78eaf4a2b11e6945e84d3bd85a114c4c6248284" },
+    "windows-x64": { "file": "harness-windows-x64-0.3.0.jar", "sha256": "1f5256794fe9248d4fd9bce2a6d422136df3caabde5de9b7519ef69d3bd5f52b" }
   },
   "runtimes": {
-    "linux-x64":   { "file": "harness-runtime-linux-x64-0.2.0.tar.gz",   "sha256": "d58b1affaab0c3fe3c50d7efd7e33bd5d581b697ba755df258373d5cb6f4d8a4" },
-    "macos-arm64": { "file": "harness-runtime-macos-arm64-0.2.0.tar.gz", "sha256": "872bf7d9e5d81000353fbed63d05578903e48844d32fa0728fcd5caf6b5f05e2" },
-    "windows-x64": { "file": "harness-runtime-windows-x64-0.2.0.zip",     "sha256": "b8bd84f547d7dee56840154fe48453803746f1ae983fc50e9c7f55c3c6637924" }
+    "linux-x64":   { "file": "harness-runtime-linux-x64-0.3.0.tar.gz",   "sha256": "757c508cd2c3b3e2e14026ab9939e2bba7956b379fc958dae7c8b07418a776ea" },
+    "macos-arm64": { "file": "harness-runtime-macos-arm64-0.3.0.tar.gz", "sha256": "ba48a32aa6a3474399ca23887e47fe99a27475f8448a73015e237b8020c3352e" },
+    "windows-x64": { "file": "harness-runtime-windows-x64-0.3.0.zip",     "sha256": "475903a34fade70bebff54d0b539a56f3fb79855aa7b170423cb6a2f2023f15a" }
   }
 }
