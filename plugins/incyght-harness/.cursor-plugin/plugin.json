@@ -1,0 +1,15 @@
+{
+  "name": "incyght",
+  "version": "0.3.0",
+  "description": "Maps an application into its pages, APIs, architecture and domain rules, then uses that map to threat model every change and keep security a required acceptance criterion during agentic development.",
+  "author": { "name": "Incyght" },
+  "mcpServers": {
+    "incyght_harness": {
+      "command": "${CURSOR_PLUGIN_ROOT}/bin/incyght-harness-launch",
+      "env": {
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
+        "INCYGHT_TOKEN": "${env:INCYGHT_TOKEN}"
+      }
+    }
+  }
+}
