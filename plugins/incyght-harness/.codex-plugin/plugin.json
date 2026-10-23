@@ -1,9 +1,9 @@
 {
-  "name": "incyght-harness",
+  "name": "incyght",
   "mcpServers": {
     "incyght_harness": {
       "command": "./bin/incyght-harness-launch",
-      "env_vars": ["INCYGHT_TOKEN"]
+      "env_vars": ["INCYGHT_TOKEN", "ANTHROPIC_API_KEY"]
     }
   }
 }
